@@ -14,8 +14,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { createUserFn } from "@/lib/admin.functions";
-import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/users")({
   component: UsersPage,
@@ -46,7 +44,6 @@ function AddUserDialog() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const createUser = useServerFn(createUserFn);
 
   const { data: roles } = useQuery({
     queryKey: ["all-roles"],
@@ -82,10 +79,13 @@ function AddUserDialog() {
 
       if (!email || !fullName || !roleId) throw new Error("Email, name, and role are required");
 
-      return createUser({
-        data: { email, fullName, roleId, departmentId, collegeId },
-        headers: { authorization: `Bearer ${session?.access_token}` },
+      const { data, error } = await supabase.functions.invoke("create-user", {
+        body: { email, fullName, roleId, departmentId, collegeId },
       });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-profiles"] });
