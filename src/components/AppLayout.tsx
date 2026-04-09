@@ -21,6 +21,12 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Redirect to change password if required
+  if (user?.profile?.must_change_password) {
+    navigate({ to: "/change-password" });
+    return null;
+  }
+
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ["unread-notifications", user?.id],
     queryFn: async () => {
