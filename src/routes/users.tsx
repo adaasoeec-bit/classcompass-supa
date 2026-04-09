@@ -89,13 +89,17 @@ function AddUserDialog() {
 
       if (!email || !fullName || !roleId) throw new Error("Email, name, and role are required");
 
-      const { data, error } = await supabase.functions.invoke("create-user", {
+      const response = await supabase.functions.invoke("create-user", {
         body: { email, fullName, roleId, departmentId, collegeId },
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
+      if (response.error) {
+        // Try to extract message from the response data (edge function returns JSON body even on 400)
+        const msg = response.data?.error || response.error.message || "Failed to create user";
+        throw new Error(msg);
+      }
+      if (response.data?.error) throw new Error(response.data.error);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-profiles"] });
