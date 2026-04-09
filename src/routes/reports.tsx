@@ -240,8 +240,7 @@ function NewReportDialog() {
           </div>
 
           <div className="flex justify-end gap-3">
-            <Button type="submit" name="status" value="draft" variant="outline">Save as Draft</Button>
-            <Button type="submit" name="status" value="submitted">Submit for Approval</Button>
+            <Button type="submit" name="status" value="draft">Save as Draft</Button>
           </div>
         </form>
       </DialogContent>
