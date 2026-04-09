@@ -78,8 +78,21 @@ Deno.serve(async (req) => {
 
     const userId = newUser.user.id;
 
-    // Set must_change_password flag
-    await adminClient.from("profiles").update({ must_change_password: true }).eq("user_id", userId);
+    // Create profile row immediately so the user shows up in admin UI
+    const { error: profileError } = await adminClient.from("profiles").insert({
+      user_id: userId,
+      full_name: fullName,
+      email,
+      must_change_password: true,
+    });
+
+    if (profileError) {
+      await adminClient.auth.admin.deleteUser(userId);
+      return new Response(JSON.stringify({ error: profileError.message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Assign role
     const { error: roleError } = await adminClient.from("user_roles").insert({

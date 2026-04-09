@@ -274,11 +274,18 @@ function ReportsList() {
 
   const submitReport = useMutation({
     mutationFn: async (reportId: string) => {
-      const { error } = await supabase
-        .from("class_reports")
-        .update({ status: "submitted" as any, submitted_at: new Date().toISOString() })
-        .eq("id", reportId);
-      if (error) throw error;
+      const response = await supabase.functions.invoke("submit-report", {
+        body: { reportId },
+      });
+
+      if (response.error) {
+        const message = response.data?.error || response.error.message || "Failed to submit report";
+        throw new Error(message);
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reports"] });

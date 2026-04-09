@@ -281,12 +281,60 @@ function UsersList() {
         supabase.from("user_colleges").select("user_id, college_id"),
       ]);
 
-      return (profilesRes.data || []).map((p: any) => ({
-        ...p,
-        user_roles: (rolesRes.data || []).filter((r: any) => r.user_id === p.user_id),
-        user_departments: (deptsRes.data || []).filter((d: any) => d.user_id === p.user_id),
-        user_colleges: (collegesRes.data || []).filter((c: any) => c.user_id === p.user_id),
-      }));
+      const profilesData = profilesRes.data || [];
+      const rolesData = rolesRes.data || [];
+      const departmentsData = deptsRes.data || [];
+      const collegesData = collegesRes.data || [];
+
+      const groupByUserId = (items: any[]) => {
+        const grouped = new Map<string, any[]>();
+
+        for (const item of items) {
+          if (!item.user_id) continue;
+          const existing = grouped.get(item.user_id) || [];
+          existing.push(item);
+          grouped.set(item.user_id, existing);
+        }
+
+        return grouped;
+      };
+
+      const profilesByUserId = new Map(profilesData.map((profile: any) => [profile.user_id, profile]));
+      const rolesByUserId = groupByUserId(rolesData);
+      const departmentsByUserId = groupByUserId(departmentsData);
+      const collegesByUserId = groupByUserId(collegesData);
+
+      const allUserIds = new Set<string>([
+        ...profilesByUserId.keys(),
+        ...rolesByUserId.keys(),
+        ...departmentsByUserId.keys(),
+        ...collegesByUserId.keys(),
+      ]);
+
+      return Array.from(allUserIds)
+        .map((userId) => {
+          const profile = profilesByUserId.get(userId);
+
+          return {
+            id: profile?.id || `missing-${userId}`,
+            user_id: userId,
+            full_name: profile?.full_name || "Unnamed user",
+            email: profile?.email || "",
+            must_change_password: profile?.must_change_password ?? false,
+            avatar_url: profile?.avatar_url ?? null,
+            phone: profile?.phone ?? null,
+            created_at: profile?.created_at || "",
+            updated_at: profile?.updated_at || "",
+            user_roles: rolesByUserId.get(userId) || [],
+            user_departments: departmentsByUserId.get(userId) || [],
+            user_colleges: collegesByUserId.get(userId) || [],
+          };
+        })
+        .sort((a, b) => {
+          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return bTime - aTime;
+        });
     },
   });
 
@@ -329,7 +377,7 @@ function UsersList() {
                       <Badge variant="outline" className="text-[10px]">Pending Password Change</Badge>
                     )}
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">{profile.email}</p>
+                  <p className="truncate text-xs text-muted-foreground">{profile.email || "No email available"}</p>
                 </div>
                 <Badge variant="outline" className="shrink-0">
                   <Shield className="mr-1 h-3 w-3" />
