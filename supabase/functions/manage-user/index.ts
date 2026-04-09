@@ -58,12 +58,47 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Update profile
+      // Update or create profile
       if (fullName || email) {
-        const updates: Record<string, string> = {};
+        const updates: Record<string, string | null> = {};
         if (fullName) updates.full_name = fullName;
         if (email) updates.email = email;
-        await adminClient.from("profiles").update(updates).eq("user_id", userId);
+
+        const { data: existingProfile, error: profileLookupError } = await adminClient
+          .from("profiles")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (profileLookupError) {
+          return new Response(JSON.stringify({ error: profileLookupError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (existingProfile) {
+          const { error: profileUpdateError } = await adminClient.from("profiles").update(updates).eq("user_id", userId);
+          if (profileUpdateError) {
+            return new Response(JSON.stringify({ error: profileUpdateError.message }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } else {
+          const { error: profileInsertError } = await adminClient.from("profiles").insert({
+            user_id: userId,
+            full_name: fullName || "",
+            email: email || null,
+          });
+
+          if (profileInsertError) {
+            return new Response(JSON.stringify({ error: profileInsertError.message }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
       }
 
       // Update email in auth if changed

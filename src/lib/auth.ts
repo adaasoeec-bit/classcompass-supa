@@ -19,7 +19,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     .from("profiles")
     .select("*")
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   const { data: userRoles } = await supabase
     .from("user_roles")
