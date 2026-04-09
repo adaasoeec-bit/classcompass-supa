@@ -270,11 +270,19 @@ function UsersList() {
   const { data: profiles, isLoading } = useQuery({
     queryKey: ["all-profiles"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("*, user_roles(role_id, roles(name)), user_departments(department_id), user_colleges(college_id)")
-        .order("created_at", { ascending: false });
-      return data || [];
+      const [profilesRes, rolesRes, deptsRes, collegesRes] = await Promise.all([
+        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.from("user_roles").select("user_id, role_id, roles(name)"),
+        supabase.from("user_departments").select("user_id, department_id"),
+        supabase.from("user_colleges").select("user_id, college_id"),
+      ]);
+
+      return (profilesRes.data || []).map((p: any) => ({
+        ...p,
+        user_roles: (rolesRes.data || []).filter((r: any) => r.user_id === p.user_id),
+        user_departments: (deptsRes.data || []).filter((d: any) => d.user_id === p.user_id),
+        user_colleges: (collegesRes.data || []).filter((c: any) => c.user_id === p.user_id),
+      }));
     },
   });
 
