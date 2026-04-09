@@ -240,8 +240,7 @@ function NewReportDialog() {
           </div>
 
           <div className="flex justify-end gap-3">
-            <Button type="submit" name="status" value="draft" variant="outline">Save as Draft</Button>
-            <Button type="submit" name="status" value="submitted">Submit for Approval</Button>
+            <Button type="submit" name="status" value="draft">Save as Draft</Button>
           </div>
         </form>
       </DialogContent>
@@ -251,6 +250,7 @@ function NewReportDialog() {
 
 function ReportsList() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -270,6 +270,22 @@ function ReportsList() {
       return data || [];
     },
     enabled: !!user,
+  });
+
+  const submitReport = useMutation({
+    mutationFn: async (reportId: string) => {
+      const { error } = await supabase
+        .from("class_reports")
+        .update({ status: "submitted" as any, submitted_at: new Date().toISOString() })
+        .eq("id", reportId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Report submitted for approval");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const filtered = (reports || []).filter((r: any) =>
@@ -330,12 +346,11 @@ function ReportsList() {
           {filtered.map((report: any) => (
             <Card key={report.id} className="stat-card-shadow transition-shadow hover:shadow-md">
               <CardContent className="flex items-center gap-4 p-4">
-                {report.instructor_attended === false && (
+                {report.instructor_attended === false ? (
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
                     <AlertTriangle className="h-5 w-5 text-destructive" />
                   </div>
-                )}
-                {report.instructor_attended !== false && (
+                ) : (
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                     <FileText className="h-5 w-5 text-primary" />
                   </div>
@@ -359,9 +374,20 @@ function ReportsList() {
                     {report.academic_year && `Year: ${report.academic_year}`} {report.section_name && `· ${report.section_name}`} {report.class_hour && `· ${report.class_hour}`}
                   </p>
                 </div>
-                <div className="hidden text-right text-xs text-muted-foreground sm:block">
-                  <p>Present: {report.students_present}/{report.students_total}</p>
-                  <p className="capitalize">{report.teaching_method}</p>
+                <div className="flex items-center gap-3">
+                  <div className="hidden text-right text-xs text-muted-foreground sm:block">
+                    <p>Present: {report.students_present}/{report.students_total}</p>
+                    <p className="capitalize">{report.teaching_method}</p>
+                  </div>
+                  {(report.status === "draft" || report.status === "rejected") && (
+                    <Button
+                      size="sm"
+                      onClick={() => submitReport.mutate(report.id)}
+                      disabled={submitReport.isPending}
+                    >
+                      Submit
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
