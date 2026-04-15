@@ -63,5 +63,5 @@ jobs:
             echo "CLOUDFLARE_ACCOUNT_ID is missing in GitHub Secrets."
             exit 1
           fi
-          npx --yes wrangler@4 deploy --log-level debug
+          npx --yes wrangler@4 deploy
 
