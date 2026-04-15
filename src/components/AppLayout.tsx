@@ -70,11 +70,17 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-5">
-            <img src={astuLogo} alt="ASTU Logo" className="h-9 w-9 rounded-full" />
-            <div>
-              <h1 className="text-sm font-bold tracking-tight">ClassReport</h1>
-              <p className="text-[10px] uppercase tracking-widest text-sidebar-foreground/60">ASTU</p>
-            </div>
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-3"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <img src={astuLogo} alt="ASTU Logo" className="h-9 w-9 rounded-full" />
+              <div>
+                <h1 className="text-sm font-bold tracking-tight">ClassReport</h1>
+                <p className="text-[10px] uppercase tracking-widest text-sidebar-foreground/60">ASTU</p>
+              </div>
+            </Link>
             <button className="ml-auto lg:hidden" onClick={() => setSidebarOpen(false)}>
               <X className="h-5 w-5" />
             </button>
