@@ -161,9 +161,9 @@ function devServerFnErrorLogger() {
 }
 
 export default defineConfig(({ command, mode }) => {
-  // Use Cloudflare Workers plugin for builds (produces worker output)
-  // Skip for dev server (command=serve) since workerd runtime isn't available
-  const useCloudflare = command === "build";
+  // Cloudflare Workers build output is not compatible with Vercel static hosting.
+  // Only enable the Cloudflare plugin when explicitly requested.
+  const useCloudflare = command === "build" && process.env.BUILD_TARGET === "cloudflare";
 
   const env = loadEnv(mode, process.cwd(), "VITE_");
   const envDefine: Record<string, string> = {};
@@ -172,6 +172,9 @@ export default defineConfig(({ command, mode }) => {
   }
 
   return {
+    build: {
+      outDir: "dist",
+    },
     server: {
       host: "::",
       port: 8080,
