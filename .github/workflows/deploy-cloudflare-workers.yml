@@ -40,9 +40,18 @@ jobs:
           else
             echo "CLOUDFLARE_API_TOKEN: (present, length=${#CLOUDFLARE_API_TOKEN})"
           fi
-          npx --yes wrangler@3 --version
-          # This will fail with a clear message if the token is missing/invalid
-          npx --yes wrangler@3 whoami
+          npx --yes wrangler@4 --version
+          echo "Running wrangler whoami (expect success)..."
+          set +e
+          WHOAMI_OUT="$(npx --yes wrangler@4 whoami 2>&1)"
+          WHOAMI_CODE=$?
+          set -e
+          echo "$WHOAMI_OUT"
+          echo "wrangler whoami exit_code=$WHOAMI_CODE"
+          if [ "$WHOAMI_CODE" -ne 0 ]; then
+            echo "Wrangler auth failed. This is almost always an invalid token or insufficient token scopes."
+            exit "$WHOAMI_CODE"
+          fi
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
