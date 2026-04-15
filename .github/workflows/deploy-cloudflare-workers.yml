@@ -35,6 +35,11 @@ jobs:
           set -euo pipefail
           echo "Node: $(node -v)"
           echo "NPM:  $(npm -v)"
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "CLOUDFLARE_API_TOKEN: (missing)"
+          else
+            echo "CLOUDFLARE_API_TOKEN: (present, length=${#CLOUDFLARE_API_TOKEN})"
+          fi
           npx --yes wrangler@3 --version
           # This will fail with a clear message if the token is missing/invalid
           npx --yes wrangler@3 whoami
