@@ -1,0 +1,16 @@
+name = "classcompass-supa"
+compatibility_date = "2026-04-15"
+
+# TanStack Start + Cloudflare Vite plugin output
+main = "dist/worker/index.js"
+
+[assets]
+directory = "dist/client"
+
+[vars]
+# Set these in Cloudflare dashboard or via `wrangler secret put` if you prefer.
+# Client-side (Vite) variables must be prefixed with VITE_
+# VITE_SUPABASE_URL = "https://xxxxx.supabase.co"
+# VITE_SUPABASE_PUBLISHABLE_KEY = "your_anon_key"
+# VITE_SUPABASE_ANON_KEY = "your_anon_key"
+
