@@ -482,6 +482,9 @@ function NewReportDialog() {
         selectedInstructorId === "__other__"
           ? customInstructorName.trim()
           : (instructors || []).find((i: any) => i.id === selectedInstructorId)?.full_name || "";
+      const studentsPresent = parseInt(formData.get("students_present") as string) || 0;
+      const studentsAbsent = parseInt(formData.get("students_absent") as string) || 0;
+      const studentsTotal = studentsPresent + studentsAbsent;
 
       const { error } = await supabase.from("class_reports").insert({
         department_id: selectedDepartmentId || (formData.get("department_id") as string),
@@ -498,9 +501,9 @@ function NewReportDialog() {
         // Keep compatibility with DB schema where topic_covered is required.
         topic_covered: "Not specified",
         teaching_method: (formData.get("teaching_method") as any) || "lecture",
-        students_present: parseInt(formData.get("students_present") as string) || 0,
-        students_absent: parseInt(formData.get("students_absent") as string) || 0,
-        students_total: parseInt(formData.get("students_total") as string) || 0,
+        students_present: studentsPresent,
+        students_absent: studentsAbsent,
+        students_total: studentsTotal,
         issues: null,
         remarks: null,
         status: (formData.get("status") as any) || "draft",
@@ -680,7 +683,7 @@ function NewReportDialog() {
             </Select>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Students Present</Label>
               <Input name="students_present" type="number" min="0" defaultValue="0" />
@@ -688,10 +691,6 @@ function NewReportDialog() {
             <div className="space-y-2">
               <Label>Students Absent</Label>
               <Input name="students_absent" type="number" min="0" defaultValue="0" />
-            </div>
-            <div className="space-y-2">
-              <Label>Total Students</Label>
-              <Input name="students_total" type="number" min="0" defaultValue="0" />
             </div>
           </div>
 

@@ -69,21 +69,27 @@ export function exportToPDF(reports: ReportData[], title = "Class Reports") {
   doc.setFontSize(9);
   centerText(`Generated: ${new Date().toLocaleString()}`, tableStartY - 2);
 
-  const rows = reports.map((r) => [
-    r.report_date,
-    r.instructor_name || "",
-    r.instructor_attended === false ? "Absent" : "Present",
-    r.class_hour || "",
-    r.class_building || "",
-    r.room_number || "",
-    r.sections?.courses?.code || "",
-    r.courses?.programs?.name || r.sections?.courses?.programs?.name || "",
-    r.academic_year || "",
-    r.sections?.name || "",
-    r.teaching_method,
-    `${r.students_present}/${r.students_total}`,
-    r.students_total > 0 ? `${Math.round((r.students_present / r.students_total) * 100)}%` : "0%",
-  ]);
+  const rows = reports.map((r) => {
+    const total = Number.isFinite(r.students_total) && r.students_total > 0
+      ? r.students_total
+      : (r.students_present || 0) + (r.students_absent || 0);
+    const rate = total > 0 ? `${Math.round(((r.students_present || 0) / total) * 100)}%` : "0%";
+    return [
+      r.report_date,
+      r.instructor_name || "",
+      r.instructor_attended === false ? "Absent" : "Present",
+      r.class_hour || "",
+      r.class_building || "",
+      r.room_number || "",
+      r.courses?.code || r.sections?.courses?.code || "",
+      r.courses?.programs?.name || r.sections?.courses?.programs?.name || "",
+      r.academic_year || "",
+      r.sections?.name || "",
+      r.teaching_method,
+      `${r.students_present}/${total}`,
+      rate,
+    ];
+  });
 
   autoTable(doc, {
     head: [["Date", "Instructor", "Instructor Status", "Class Hour", "Building", "Room", "Course", "Program", "Class Year", "Section", "Method", "Present/Total", "Rate"]],
@@ -102,23 +108,30 @@ export function exportToExcel(reports: ReportData[], title = "Class Reports") {
   ) as string[];
   const departmentLine = departmentNames.length === 1 ? departmentNames[0] : "";
 
-  const data = reports.map((r) => ({
-    Date: r.report_date,
-    Instructor: r.instructor_name || "",
-    "Instructor Status": r.instructor_attended === false ? "Absent" : "Present",
-    "Class Hour": r.class_hour || "",
-    Building: r.class_building || "",
-    Room: r.room_number || "",
-    Course: r.sections?.courses?.code || "",
-    Program: r.courses?.programs?.name || r.sections?.courses?.programs?.name || "",
-    "Class Year": r.academic_year || "",
-    Section: r.sections?.name || "",
-    Method: r.teaching_method,
-    Present: r.students_present,
-    Absent: r.students_absent,
-    Total: r.students_total,
-    "Rate %": r.students_total > 0 ? Math.round((r.students_present / r.students_total) * 100) : 0,
-  }));
+  const data = reports.map((r) => {
+    const total = Number.isFinite(r.students_total) && r.students_total > 0
+      ? r.students_total
+      : (r.students_present || 0) + (r.students_absent || 0);
+    const rate = total > 0 ? Math.round(((r.students_present || 0) / total) * 100) : 0;
+    return {
+      Date: r.report_date,
+      Instructor: r.instructor_name || "",
+      "Instructor Status": r.instructor_attended === false ? "Absent" : "Present",
+      "Class Hour": r.class_hour || "",
+      Building: r.class_building || "",
+      Room: r.room_number || "",
+      "Course Code": r.courses?.code || r.sections?.courses?.code || "",
+      "Course Name": r.courses?.name || r.sections?.courses?.name || "",
+      Program: r.courses?.programs?.name || r.sections?.courses?.programs?.name || "",
+      "Class Year": r.academic_year || "",
+      Section: r.sections?.name || "",
+      Method: r.teaching_method,
+      Present: r.students_present,
+      Absent: r.students_absent,
+      Total: total,
+      "Rate %": rate,
+    };
+  });
 
   const headingRows = [
     ["Adama Science and Technology University"],
@@ -133,11 +146,12 @@ export function exportToExcel(reports: ReportData[], title = "Class Reports") {
   const ws = XLSX.utils.aoa_to_sheet(headingRows);
   XLSX.utils.sheet_add_json(ws, data, { origin: `A${headingRows.length + 1}` });
   ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 12 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 12 } },
-    ...(departmentLine ? [{ s: { r: 2, c: 0 }, e: { r: 2, c: 12 } }] : []),
-    { s: { r: departmentLine ? 3 : 2, c: 0 }, e: { r: departmentLine ? 3 : 2, c: 12 } },
-    { s: { r: departmentLine ? 5 : 4, c: 0 }, e: { r: departmentLine ? 5 : 4, c: 12 } },
+    // Merge headings across the whole data width (16 columns => last index 15)
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 15 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 15 } },
+    ...(departmentLine ? [{ s: { r: 2, c: 0 }, e: { r: 2, c: 15 } }] : []),
+    { s: { r: departmentLine ? 3 : 2, c: 0 }, e: { r: departmentLine ? 3 : 2, c: 15 } },
+    { s: { r: departmentLine ? 5 : 4, c: 0 }, e: { r: departmentLine ? 5 : 4, c: 15 } },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Reports");
