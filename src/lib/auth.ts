@@ -45,13 +45,22 @@ export function isAdmin(user: AuthUser | null): boolean {
 }
 
 export function canApproveReports(user: AuthUser | null): boolean {
-  return isAdmin(user) || hasRole(user, "department_head");
+  return isAdmin(user,) || hasRole(user, "department_head");
 }
+
 
 export function isDeputyHead(user: AuthUser | null): boolean {
   return hasRole(user, "deputy_department_head");
 }
 
 export function canCreateReports(user: AuthUser | null): boolean {
-  return isDeputyHead(user) || isAdmin(user);
+  return isDeputyHead(user,) || isAdmin(user) || hasRole(user, "department_head");
+}
+
+export function canViewReports(user: AuthUser | null): boolean {
+  return (
+    canCreateReports(user) ||
+    hasRole(user, "management") ||
+    hasRole(user, "ad_dean")
+  );
 }

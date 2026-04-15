@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
-import { isAdmin, canApproveReports, canCreateReports } from "@/lib/auth";
+import { isAdmin, canApproveReports, canViewReports } from "@/lib/auth";
 import {
   LayoutDashboard, FileText, CheckSquare, Building2, Users,
   Bell, LogOut, Menu, X, BarChart3
@@ -51,7 +51,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const navItems = [
     { to: "/dashboard" as const, icon: LayoutDashboard, label: "Dashboard", show: true },
-    { to: "/reports" as const, icon: FileText, label: "Reports", show: canCreateReports(user) },
+    { to: "/reports" as const, icon: FileText, label: "Reports", show: canViewReports(user) },
     { to: "/approvals" as const, icon: CheckSquare, label: "Approvals", show: canApproveReports(user) },
     { to: "/analytics" as const, icon: BarChart3, label: "Analytics", show: true },
     { to: "/organization" as const, icon: Building2, label: "Organization", show: isAdmin(user) },

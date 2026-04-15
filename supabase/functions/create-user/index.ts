@@ -20,9 +20,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const publishableKey = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY")!;
+    // Environment variables are configured as Edge Function secrets.
+    // Supabase does not allow secrets starting with the SUPABASE_ prefix,
+    // so we use neutral names here (PROJECT_URL, ANON_KEY, SERVICE_ROLE_KEY).
+    const supabaseUrl = Deno.env.get("PROJECT_URL")!;
+    const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")!;
+    const publishableKey = Deno.env.get("ANON_KEY")!;
 
     // Create a client with the caller's token to check admin status
     const callerClient = createClient(supabaseUrl, publishableKey, {
@@ -55,13 +58,35 @@ Deno.serve(async (req) => {
     const { email, fullName, roleId, departmentId, collegeId } = await req.json();
 
     if (!email || !fullName || !roleId) {
-      return new Response(JSON.stringify({ error: "Email, fullName, and roleId are required" }), {
+      return new Response(JSON.stringify({
+        error: "Email, fullName, and roleId are required",
+        stage: "validate_input",
+      }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Create user with default password
+    // Validate role exists early for clearer errors
+    const { data: roleRow, error: roleLookupError } = await adminClient
+      .from("roles")
+      .select("id")
+      .eq("id", roleId)
+      .maybeSingle();
+
+    if (roleLookupError || !roleRow) {
+      return new Response(JSON.stringify({
+        error: "Selected role does not exist",
+        stage: "validate_role",
+        details: roleLookupError,
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Create user with default password, or reuse existing user if email already exists.
+    let userId: string | undefined;
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password: "12345678",
@@ -70,37 +95,93 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
-      return new Response(JSON.stringify({ error: createError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const createMsg = createError.message?.toLowerCase() || "";
+      const isDuplicateEmail =
+        createMsg.includes("already") ||
+        createMsg.includes("registered") ||
+        createMsg.includes("exists") ||
+        createMsg.includes("duplicate");
+
+      if (!isDuplicateEmail) {
+        return new Response(JSON.stringify({
+          error: createError.message,
+          stage: "auth_create_user",
+          details: createError,
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Try to resolve existing user by email.
+      const { data: usersPage, error: listUsersError } = await adminClient.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
       });
+
+      if (listUsersError) {
+        return new Response(JSON.stringify({
+          error: listUsersError.message,
+          stage: "lookup_existing_user",
+          details: listUsersError,
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const existingUser = usersPage.users.find((u) => (u.email || "").toLowerCase() === email.toLowerCase());
+      if (!existingUser) {
+        return new Response(JSON.stringify({
+          error: "User appears to exist, but could not be resolved by email",
+          stage: "lookup_existing_user",
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      userId = existingUser.id;
+    } else {
+      userId = newUser.user.id;
     }
 
-    const userId = newUser.user.id;
+    // Avoid duplicate-key races with the auth.users -> profiles trigger.
+    // We only update profile fields if the row already exists.
+    const { error: profileUpdateError } = await adminClient
+      .from("profiles")
+      .update({
+        full_name: fullName,
+        email,
+        must_change_password: true,
+      })
+      .eq("user_id", userId);
 
-    // Create profile row immediately so the user shows up in admin UI
-    const { error: profileError } = await adminClient.from("profiles").insert({
-      user_id: userId,
-      full_name: fullName,
-      email,
-      must_change_password: true,
-    });
-
-    if (profileError) {
-      await adminClient.auth.admin.deleteUser(userId);
-      return new Response(JSON.stringify({ error: profileError.message }), {
+    if (profileUpdateError) {
+      return new Response(JSON.stringify({
+        error: profileUpdateError.message,
+        stage: "profile_update",
+        details: profileUpdateError,
+      }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Assign role
-    const { error: roleError } = await adminClient.from("user_roles").insert({
-      user_id: userId,
-      role_id: roleId,
-    });
+    const { error: roleError } = await adminClient.from("user_roles").upsert(
+      {
+        user_id: userId,
+        role_id: roleId,
+      },
+      { onConflict: "user_id,role_id" }
+    );
     if (roleError) {
-      return new Response(JSON.stringify({ error: roleError.message }), {
+      return new Response(JSON.stringify({
+        error: roleError.message,
+        stage: "assign_role",
+        details: roleError,
+      }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -108,25 +189,34 @@ Deno.serve(async (req) => {
 
     // Assign department if provided
     if (departmentId) {
-      await adminClient.from("user_departments").insert({
-        user_id: userId,
-        department_id: departmentId,
-      });
+      await adminClient.from("user_departments").upsert(
+        {
+          user_id: userId,
+          department_id: departmentId,
+        },
+        { onConflict: "user_id,department_id" }
+      );
     }
 
     // Assign college if provided
     if (collegeId) {
-      await adminClient.from("user_colleges").insert({
-        user_id: userId,
-        college_id: collegeId,
-      });
+      await adminClient.from("user_colleges").upsert(
+        {
+          user_id: userId,
+          college_id: collegeId,
+        },
+        { onConflict: "user_id,college_id" }
+      );
     }
 
     return new Response(JSON.stringify({ success: true, userId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
+    return new Response(JSON.stringify({
+      error: (err as Error).message,
+      stage: "unhandled_exception",
+    }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

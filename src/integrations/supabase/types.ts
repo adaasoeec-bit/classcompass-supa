@@ -736,6 +736,8 @@ export type Database = {
         | "department_head"
         | "instructor"
         | "deputy_department_head"
+        | "management"
+        | "ad_dean"
       approval_status: "pending" | "approved" | "rejected"
       notification_type: "info" | "success" | "warning" | "error"
       report_status:
@@ -886,6 +888,8 @@ export const Constants = {
         "department_head",
         "instructor",
         "deputy_department_head",
+        "management",
+        "ad_dean",
       ],
       approval_status: ["pending", "approved", "rejected"],
       notification_type: ["info", "success", "warning", "error"],
