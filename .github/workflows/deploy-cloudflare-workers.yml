@@ -28,9 +28,20 @@ jobs:
           BUILD_TARGET: cloudflare
         run: npm run build
 
+      - name: Wrangler diagnostics (shows real failure)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "Node: $(node -v)"
+          echo "NPM:  $(npm -v)"
+          npx --yes wrangler@3 --version
+          # This will fail with a clear message if the token is missing/invalid
+          npx --yes wrangler@3 whoami
+
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: deploy
+          command: deploy --verbose
 
