@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, FileText, Search, Filter, Download, AlertTriangle } from "lucide-react";
+import { Plus, FileText, Search, Filter, Download, AlertTriangle, Trash2 } from "lucide-react";
 import { exportToPDF, exportToExcel, exportWeeklyToPDF, exportWeeklyToExcel } from "@/lib/export-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -227,6 +227,27 @@ function WeeklyReportsList() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const deleteWeeklyReport = useMutation({
+    mutationFn: async (weeklyReportId: string) => {
+      const canDelete = hasRole(user, "super_admin") || hasRole(user, "college_admin");
+      if (!canDelete) throw new Error("You do not have permission to delete weekly reports.");
+
+      const { error } = await supabase
+        .from("weekly_department_reports")
+        .delete()
+        .eq("id", weeklyReportId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Weekly report deleted.");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["weekly-reports"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const exportableWeekly = filtered.filter((r: any) => r.status === "submitted" || r.status === "approved");
 
   const generateCollegeWeeklyReport = useMutation({
@@ -402,6 +423,20 @@ function WeeklyReportsList() {
                         Reject
                       </Button>
                     </>
+                  )}
+                  {(hasRole(user, "super_admin") || hasRole(user, "college_admin")) && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        const ok = window.confirm("Delete this generated weekly report? This action cannot be undone.");
+                        if (ok) deleteWeeklyReport.mutate(report.id);
+                      }}
+                      disabled={deleteWeeklyReport.isPending}
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />
+                      Delete
+                    </Button>
                   )}
                 </div>
               </CardContent>
